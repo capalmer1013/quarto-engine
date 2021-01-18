@@ -1,50 +1,49 @@
 from os import linesep
 import random
-from copy import deepcopy
 import math
 import time
 
+COORDS = [(x, y) for x in range(4) for y in range(4)]
+COLOR = 0
+HEIGHT = 1
+SHAPE = 2
+HOLLOW = 3
+
 class Piece(object):
     def __init__(self, color, height, shape, hollow):
-        self.color = color
-        self.height = height
-        self.shape = shape
-        self.hollow = hollow
+        self.attr_tup = (color, height, shape, hollow)
     
     def __eq__(self, other):
-        if not hasattr(other, "color") or not hasattr(other, "height") or not hasattr(other, "shape") or not hasattr(other, "hollow"):
+        if not isinstance(other, Piece):
             return False
-        return self.color == other.color and self.height == other.height and self.shape == other.shape and self.hollow == other.hollow
+        return self.attr_tup == other.attr_tup
 
     def __repr__(self):
         return "{} {} {} {}".format(int(self.color), int(self.height), int(self.shape), int(self.hollow))
     
     @staticmethod
     def generateAllPieces():
-        result = []
-        for num in range(16):
-            result.append(Piece(*[bool(num & (1<<n)) for n in range(4)]))
-        return result
+        return [Piece(*[bool(num & (1<<n)) for n in range(4)]) for num in range(16)]
     
     @staticmethod
     def checkForEquality(pieces):
-        color = set([x.color if x is not None else None for x in pieces])
-        height = set([x.height if x is not None else None for x in pieces])
-        shape = set([x.shape if x is not None else None for x in pieces])
-        hollow = set([x.hollow if x is not None else None for x in pieces])
-        if None in color or None in height or None in shape or None in hollow:
+        if None in pieces:
             return False
+        color = set([x.attr_tup[COLOR] for x in pieces])
+        height = set([x.attr_tup[HEIGHT] for x in pieces])
+        shape = set([x.attr_tup[SHAPE] for x in pieces])
+        hollow = set([x.attr_tup[HOLLOW] for x in pieces])
         if len(color) == 1 or len(height) == 1 or len(shape) == 1 or len(hollow) == 1:
             return True
         return False
 
 class Board(object):
-    def __init__(self):
-        self.state = []
-        for i in range(4):
-            self.state.append([])
-            for j in range(4):
-                self.state[i].append(None)
+    def __init__(self, state=None):
+        if state:
+            self.state=[x[:] for x in state]
+            return
+
+        self.state = [[None]*4 for _ in range(4)]
 
     def __str__(self):
         result = ""
@@ -75,50 +74,32 @@ class Board(object):
 
     
     def getAvailableSpots(self):
-        result = []
-        for i in range(4):
-            for j in range(4):
-                if self.state[i][j] is None:
-                    result.append((i, j))
-        return result
+        return [x for x in COORDS if self.state[x[0]][x[1]] is None]
     
     def checkForWin(self):
-        if self.checkRow():
+        if any([self.checkRow(), self.checkColumn(), self.checkDiagonals()]):
             return True
-        if self.checkColumn():
-            return True
-        if self.checkDiagonals():
-            return True
+
         return False
     
     def checkRow(self):
         for x in range(4):
-            piecesToCheck = []
-            for y in range(4):
-                piecesToCheck.append(self.state[x][y])
-            
+            piecesToCheck = [self.state[x][y] for y in range(4)]
+    
             if Piece.checkForEquality(piecesToCheck):
                 return True
         return False
 
     def checkColumn(self):
         for y in range(4):
-            piecesToCheck = []
-            for x in range(4):
-                piecesToCheck.append(self.state[x][y])
+            piecesToCheck = [self.state[x][y] for x in range(4)]
             
             if Piece.checkForEquality(piecesToCheck):
                 return True
         return False
 
     def checkDiagonals(self):
-        piecesToCheck = []
-        for i in range(4):
-            # print(i)
-            # print(self.state[i])
-            # print(self.state[i][3-i])
-            piecesToCheck.append(self.state[i][i])
-            piecesToCheck.append(self.state[i][3-i])
+        piecesToCheck = [self.state[i][i] for i in range(4)] + [self.state[i][3-i] for i in range(4)]
         if Piece.checkForEquality(piecesToCheck):
             return True
         False
@@ -155,12 +136,12 @@ def testRandom():
 def buildTree():
     pieces = Piece.generateAllPieces()
     board = Board()
-    move_count = 8
-    for _ in range(move_count):
-        spot = random.choice(board.getAvailableSpots())
-        piece = pieces.pop()
-        board.place(*spot, piece)
-    return recursiveTree(pieces, board, 0, 12-move_count)
+    move_count = 1
+    # for _ in range(move_count):
+    #     spot = random.choice(board.getAvailableSpots())
+    #     piece = pieces.pop()
+    #     board.place(*spot, piece)
+    return recursiveTree(pieces, board, 0, 2)
 
 def recursiveTree(pieces, board, depth=0, depth_limit=6):
     global winCount
@@ -168,13 +149,15 @@ def recursiveTree(pieces, board, depth=0, depth_limit=6):
     global totalEliminated
     global playerAWins
     global playerBWins
+    global depth_count
     if depth >= depth_limit:
+        depth_count += 1
         return None
     result = {}
     for piece in pieces:
         for spot in board.getAvailableSpots():
-            newBoard = deepcopy(board)
-            newPieces = deepcopy(pieces)
+            newBoard = Board(board.state)
+            newPieces = [x for x in pieces]
             newPieces.remove(piece)
             if newBoard.place(*spot, piece):
                 winCount += 1
@@ -183,18 +166,13 @@ def recursiveTree(pieces, board, depth=0, depth_limit=6):
                 else:
                     playerBWins += 1
                 totalEliminated += math.factorial(len(pieces))
-                if winCount % 10000 == 0:
-                    pass
-                    #print(winCount)
-                    #print(str(totalCombo - totalEliminated)+" possibilities remaining")
-                    #print(str(totalEliminated - winCount)+" eliminations")
                 return board
             else:
                 result[newBoard] = recursiveTree(newPieces, newBoard, depth+1, depth_limit)
     
     return result
 
-
+depth_count = 0
 totalCombo = math.factorial(16)
 totalEliminated = 0
 winCount = 0
@@ -204,5 +182,6 @@ playerBWins = 0
 start_time = time.time()
 buildTree()
 print("{} wins found, {} ties found in {} seconds".format(winCount, tieCount, time.time()-start_time))
+print(str(depth_count) + " Nodes visited")
 print(str(playerAWins) + " Wins for A")
 print(str(playerBWins)+" Wins for B")
