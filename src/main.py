@@ -2,6 +2,8 @@ from os import linesep
 import random
 import math
 import time
+import argparse
+import numpy
 
 COORDS = [(x, y) for x in range(4) for y in range(4)]
 COLOR = 0
@@ -105,6 +107,14 @@ class Board(object):
         False
 
 
+
+def getDictKeys(x):
+    result = []
+    for each in x.values():
+        if type(each) is dict:
+            result += getDictKeys(each)
+    return [ i for i in x.keys()] + result
+
 def printAvailPieces(p):
     for i in p:
         print(i)
@@ -133,17 +143,16 @@ def testRandom():
     print(board)
 
 
-def buildTree():
+def buildTree(move_count=0):
     pieces = Piece.generateAllPieces()
     board = Board()
-    move_count = 1
-    # for _ in range(move_count):
-    #     spot = random.choice(board.getAvailableSpots())
-    #     piece = pieces.pop()
-    #     board.place(*spot, piece)
-    return recursiveTree(pieces, board, 0, 2)
+    for _ in range(move_count):
+        spot = random.choice(board.getAvailableSpots())
+        piece = pieces.pop()
+        board.place(*spot, piece)
+    return recursiveTreeGlobal(pieces, board, 0, 2, node=TREE)
 
-def recursiveTree(pieces, board, depth=0, depth_limit=6):
+def recursiveTree_parallel(pieces, board, depth=0, depth_limit=6):
     global winCount
     global tieCount
     global totalEliminated
@@ -172,6 +181,28 @@ def recursiveTree(pieces, board, depth=0, depth_limit=6):
     
     return result
 
+def recursiveTreeGlobal(pieces, board, depth=0, depth_limit=6, node=None):
+    global TREE
+    if depth >= depth_limit:
+        return None
+    for piece in pieces:
+        for spot in board.getAvailableSpots():
+            newBoard = Board(board.state)
+            newPieces = [x for x in pieces]
+            newPieces.remove(piece)
+            if newBoard.place(*spot, piece):
+                node[newBoard] = board.state
+            for i in range(3)
+            else:
+                if node:
+                    node[newBoard] = {}
+                    recursiveTreeGlobal(newPieces, newBoard, depth+1, depth_limit, node[newBoard])
+                else:
+                    TREE[newBoard] = {}
+                    recursiveTreeGlobal(newPieces, newBoard, depth+1, depth_limit, TREE[newBoard])
+
+
+TREE = {}
 depth_count = 0
 totalCombo = math.factorial(16)
 totalEliminated = 0
@@ -185,3 +216,7 @@ print("{} wins found, {} ties found in {} seconds".format(winCount, tieCount, ti
 print(str(depth_count) + " Nodes visited")
 print(str(playerAWins) + " Wins for A")
 print(str(playerBWins)+" Wins for B")
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument()
+# args = parser.parse_args()
